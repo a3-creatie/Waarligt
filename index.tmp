@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WaarLigt?</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1769d1">
+  <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>WaarLigt?</h1>
+        <p>Vind je spullen met typen óf je stem.</p>
+      </div>
+      <button id="voiceBtn" class="voice" type="button">🎤 Spreek</button>
+      <button id="addBtn" class="primary" type="button">+ Spul toevoegen</button>
+    </header>
+
+    <section class="voiceHelp">
+      <strong>Spraak:</strong>
+      zeg bijvoorbeeld <em>“Waar ligt mijn boormachine?”</em> of
+      <em>“Voeg sleutels toe, thuis, hal kastje.”</em>
+    </section>
+
+    <section class="searchRow">
+      <input id="search" type="search" placeholder="Zoek een spul...">
+      <button id="searchVoiceBtn" class="mic" type="button" aria-label="Zoeken met stem">🎤</button>
+    </section>
+
+    <nav class="filters">
+      <button class="filter active" data-location="Alle">Alle</button>
+      <button class="filter" data-location="Thuis">Thuis</button>
+      <button class="filter" data-location="Werk">Werk</button>
+      <button class="filter" data-location="Camping">Camping</button>
+    </nav>
+
+    <p id="summary" class="summary"></p>
+    <section id="list"></section>
+    <p id="empty" class="empty" hidden>Geen spullen gevonden.</p>
+  </main>
+
+  <dialog id="itemDialog">
+    <form method="dialog" id="itemForm">
+      <h2 id="dialogTitle">Spul toevoegen</h2>
+      <input type="hidden" id="itemId">
+      <label>Naam
+        <div class="inputVoiceRow">
+          <input id="name" required placeholder="Bijv. boormachine">
+          <button id="addVoiceNameBtn" class="mic" type="button" aria-label="Naam inspreken">🎤</button>
+        </div>
+      </label>
+      <label>Locatie
+        <select id="location">
+          <option>Thuis</option>
+          <option>Werk</option>
+          <option>Camping</option>
+        </select>
+      </label>
+      <label>Plek
+        <textarea id="place" rows="2" placeholder="Bijv. garage, kast links"></textarea>
+      </label>
+      <label>Notitie
+        <textarea id="note" rows="3" placeholder="Extra informatie"></textarea>
+      </label>
+      <button id="addVoiceBtn" class="voice dialogVoice" type="button">🎤 Inspreken</button>
+      <div class="dialogActions">
+        <button type="button" id="cancelBtn">Annuleren</button>
+        <button type="submit" class="primary">Opslaan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js?v=10"></script>
+  <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./service-worker-v11.js");}</script>
+</body>
+</html>
