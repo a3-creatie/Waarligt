@@ -124,32 +124,80 @@ function showToast(msg){
   clearTimeout(showToast.t);showToast.t=setTimeout(()=>$("toast").hidden=true,3000);
 }
 
-// Voice recognition: Android Chrome/Samsung Internet support varies.
+// Voice recognition: create a fresh recognizer for every recording.
+// This is more reliable on Android browsers than reusing one SpeechRecognition instance.
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
 let recognition=null;
-if(SpeechRecognition){
-  recognition=new SpeechRecognition();
-  recognition.lang="nl-NL";
-  recognition.interimResults=false;
-  recognition.continuous=false;
-  recognition.maxAlternatives=1;
-  recognition.onstart=()=>document.querySelectorAll(".voice,.mic").forEach(b=>b.classList.add("listening"));
-  recognition.onend=()=>document.querySelectorAll(".voice,.mic").forEach(b=>b.classList.remove("listening"));
-  recognition.onerror=e=>{
-    document.querySelectorAll(".voice,.mic").forEach(b=>b.classList.remove("listening"));
-    showToast("Spraak werkte niet: "+(e.error==="not-allowed"?"microfoon toestemming ontbreekt.":"probeer het opnieuw."));
+
+function voiceErrorMessage(code){
+  const messages={
+    "not-allowed":"Microfoon geblokkeerd. Geef WaarLigt toestemming voor de microfoon.",
+    "service-not-allowed":"De spraakdienst van deze browser is niet beschikbaar.",
+    "network":"De spraakdienst kon niet worden bereikt. Controleer je internetverbinding.",
+    "no-speech":"Ik hoorde geen spraak. Probeer iets dichter bij de telefoon te spreken.",
+    "audio-capture":"De microfoon kon niet worden geopend.",
+    "language-not-supported":"Nederlandse spraakherkenning wordt hier niet ondersteund.",
+    "aborted":"Spraakopname gestopt."
   };
-}else{
-  $("voiceBtn").disabled=true;$("searchVoiceBtn").disabled=true;
-  showToast("Deze browser ondersteunt geen spraakherkenning.");
+  return messages[code] || `Spraakherkenning gaf fout: ${code||"onbekend"}.`;
+}
+
+function clearListening(){
+  document.querySelectorAll(".voice,.mic").forEach(b=>b.classList.remove("listening"));
+}
+
+function makeRecognition(){
+  if(!SpeechRecognition)return null;
+  const r=new SpeechRecognition();
+  r.lang="nl-NL";
+  r.interimResults=true;
+  r.continuous=false;
+  r.maxAlternatives=3;
+  return r;
+}
+
+function startRecognition(onText){
+  if(!SpeechRecognition){
+    showToast("Deze browser ondersteunt geen web-spraakherkenning. Gebruik de microfoon van je toetsenbord.");
+    return false;
+  }
+  recognition=makeRecognition();
+  let handled=false;
+  recognition.onstart=()=>document.querySelectorAll(".voice,.mic").forEach(b=>b.classList.add("listening"));
+  recognition.onerror=e=>{
+    if(handled)return;
+    handled=true;
+    clearListening();
+    showToast(voiceErrorMessage(e.error));
+  };
+  recognition.onresult=e=>{
+    let text="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      text += e.results[i][0].transcript+" ";
+      if(e.results[i].isFinal){
+        const heard=text.trim();
+        if(heard){handled=true;onText(heard);}
+      }
+    }
+  };
+  recognition.onend=()=>{
+    clearListening();
+    recognition=null;
+  };
+  try{
+    recognition.start();
+    return true;
+  }catch(e){
+    clearListening();
+    showToast("Spraakopname kon niet starten. Druk nogmaals op de microfoon.");
+    recognition=null;
+    return false;
+  }
 }
 
 function listen(mode){
-  if(!recognition){showToast("Gebruik Chrome op Android voor spraakherkenning.");return}
-  recognition.onresult=(event)=>{
-    const text=event.results[0][0].transcript.trim();
+  startRecognition(text=>{
     if(mode==="search"){
-      // Een spraakzoekopdracht zoekt altijd overal, ook als een locatie-filter actief was.
       activeLocation="Alle";
       document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("active",x.dataset.location==="Alle"));
       $("search").value=text.replace(/^waar ligt (mijn|de|het)\s+/i,"");
@@ -157,8 +205,7 @@ function listen(mode){
     }else{
       handleVoiceCommand(text);
     }
-  };
-  setTimeout(()=>{try{recognition.start()}catch(e){}},1000)
+  });
 }
 
 function normalizeItemName(value){
@@ -339,23 +386,7 @@ $("voiceBtn").onclick=()=>listen("command");
 $("searchVoiceBtn").onclick=()=>listen("search");
 
 function listenIntoField(fieldId, mode="replace") {
-  if(!recognition){showToast("Gebruik Chrome op Android voor spraakherkenning.");return}
-  recognition.continuous=false;
-  recognition.interimResults=false;
-  recognition.maxAlternatives=1;
-  let heard="", gotResult=false;
-  recognition.onresult=(event)=>{
-    if(gotResult)return;
-    const result=event.results[0];
-    if(result && result.isFinal){
-      heard=result[0].transcript.trim();
-      gotResult=true;
-      try{recognition.stop()}catch(e){}
-    }
-  };
-  recognition.onend=()=>{
-    document.querySelectorAll(".voice,.mic").forEach(b=>b.classList.remove("listening"));
-    if(!heard)return;
+  startRecognition(heard=>{
     const field=$(fieldId);
     if(!field)return;
     if(mode==="append"){
@@ -366,8 +397,7 @@ function listenIntoField(fieldId, mode="replace") {
     }
     field.focus();
     showToast(mode==="append" ? "Tekst aan de notitie toegevoegd." : "Veld ingevuld met je stem.");
-  };
-  try{recognition.start()}catch(e){}
+  });
 }
 
 function tryMoveFromSpeech(spoken){
